@@ -1,0 +1,23 @@
+name: Run Tests
+
+# - run tests
+
+on:
+  push:
+    branches: master
+
+jobs:
+  build:
+    environment: github-action-code-coverage
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: 16.x
+        cache: 'npm'
+
+    - run: npm ci
+    - run: npm test
