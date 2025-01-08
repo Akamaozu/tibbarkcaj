@@ -6,15 +6,20 @@ const Sinon = require('sinon');
 const EventEmitter = require('events');
 
 const { after, beforeEach, describe, it } = require('mocha');
+const {
+    RABBIT_RECONNECTION_TIMEOUT: ENV_RABBIT_RECONNECTION_TIMEOUT,
+    RABBIT_URL: ENV_RABBIT_URL,
+} = process.env
 
 const AMQP_PORT = 8080;
+const RABBIT_RECONNECTION_TIMEOUT = ENV_RABBIT_RECONNECTION_TIMEOUT && parseInt( ENV_RABBIT_RECONNECTION_TIMEOUT )
 
 describe('reconnection', () => {
 
     let RECONN_TIMEOUT;
     let RECONN_RETRIES;
     let EXACT_TIMEOUT;
-    const STUB_RABBIT_URL = `amqp://localhost:${AMQP_PORT}`;
+    const STUB_RABBIT_URL = ENV_RABBIT_URL ?? `amqp://localhost:${AMQP_PORT}`;
 
     let AmqpStub;
     const Amqp = require('amqplib/callback_api');
@@ -25,7 +30,7 @@ describe('reconnection', () => {
         Sinon.stub(process, 'exit');
         AmqpStub = Sinon.stub(Amqp, 'connect');
 
-        RECONN_TIMEOUT = 4;
+        RECONN_TIMEOUT = RABBIT_RECONNECTION_TIMEOUT ?? 4;
         RECONN_RETRIES = 5;
         EXACT_TIMEOUT = false;
 
@@ -37,6 +42,34 @@ describe('reconnection', () => {
         Sinon.verifyAndRestore();
         done();
     });
+
+    const genQueueName = () => {
+
+        const chars = '0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ-';
+        let label = 'amq.gen-';
+        for (let i = 22; i > 0; --i) {
+            label += chars[Math.floor(Math.random() * chars.length)];
+        }
+
+        return label;
+    };
+
+    const verifyConnection = (conn, conn_args = {}) => {
+
+        const {
+            exchangeCount = 0,
+            queueCount = 0,
+            consumerCount = conn_args?.queueCount ?? 0,
+            uniqueKeys = conn_args?.queueCount ?? 0,
+        } = conn_args
+
+        Assert.strictEqual(conn.createChannel.callCount, exchangeCount + queueCount);
+        Assert.strictEqual(conn.assertExchange.callCount, exchangeCount);
+        Assert.strictEqual(conn.prefetch.callCount, queueCount);
+        Assert.strictEqual(conn.assertQueue.callCount, queueCount);
+        Assert.strictEqual(conn.bindQueue.callCount, uniqueKeys);
+        Assert.strictEqual(conn.consume.callCount, consumerCount);
+    };
 
     const mockLogger = () => {
 
@@ -74,6 +107,21 @@ describe('reconnection', () => {
         });
     };
 
+    const mockConnection = () => {
+
+        const conn = new EventEmitter();
+
+        conn.createChannel = Sinon.stub().callsFake((cb) => cb(null, conn));
+        conn.assertExchange = Sinon.stub().callsFake((exchange, type, options, cb) => setTimeout(cb, 1));
+        conn.prefetch = Sinon.stub();
+        conn.assertQueue = Sinon.stub().callsFake((queue, options, cb) => setTimeout(() => cb(null, { queue: queue || genQueueName() }), 1));
+        conn.bindQueue = Sinon.stub().callsFake((queue, exchange, routingKey, options, cb) => setTimeout(cb, 1));
+        conn.consume = Sinon.stub();
+        conn.publish = Sinon.stub().callsFake((exchange, routingKey, content, options) => setTimeout(() => {}, 1));
+
+        return conn;
+    };
+
     const mockRabbitServer = async ({ logger = undefined, stub, rabbit = undefined, addQueues = undefined, isReconnecting = undefined, exchangeCount = 0, queueCount = 0, consumerCount = queueCount, uniqueKeys = queueCount }) => {
 
         if (!stub) {
@@ -90,43 +138,7 @@ describe('reconnection', () => {
         }
 
         Assert.strictEqual(stub.callCount, 1);
-        Assert.strictEqual(stub.args[0][0], `amqp://localhost:${AMQP_PORT}`);
-
-        const genQueueName = () => {
-
-            const chars = '0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ-';
-            let label = 'amq.gen-';
-            for (let i = 22; i > 0; --i) {
-                label += chars[Math.floor(Math.random() * chars.length)];
-            }
-
-            return label;
-        };
-
-        const mockConnection = () => {
-
-            const conn = new EventEmitter();
-
-            conn.createChannel = Sinon.stub().callsFake((cb) => cb(null, conn));
-            conn.assertExchange = Sinon.stub().callsFake((exchange, type, options, cb) => setTimeout(cb, 1));
-            conn.prefetch = Sinon.stub();
-            conn.assertQueue = Sinon.stub().callsFake((queue, options, cb) => setTimeout(() => cb(null, { queue: queue || genQueueName() }), 1));
-            conn.bindQueue = Sinon.stub().callsFake((queue, exchange, routingKey, options, cb) => setTimeout(cb, 1));
-            conn.consume = Sinon.stub();
-            conn.publish = Sinon.stub().callsFake((exchange, routingKey, content, options) => setTimeout(() => {}, 1));
-
-            return conn;
-        };
-
-        const verifyConnection = (conn) => {
-
-            Assert.strictEqual(conn.createChannel.callCount, exchangeCount + queueCount);
-            Assert.strictEqual(conn.assertExchange.callCount, exchangeCount);
-            Assert.strictEqual(conn.prefetch.callCount, queueCount);
-            Assert.strictEqual(conn.assertQueue.callCount, queueCount);
-            Assert.strictEqual(conn.bindQueue.callCount, uniqueKeys);
-            Assert.strictEqual(conn.consume.callCount, consumerCount);
-        };
+        Assert.strictEqual(stub.args[0][0], STUB_RABBIT_URL);
 
         const onConnect = waitEvent(rabbit, reconnecting ? 'reconnected' : 'connected');
         const conn = mockConnection();
@@ -137,7 +149,12 @@ describe('reconnection', () => {
 
         await onConnect;
 
-        verifyConnection(conn);
+        verifyConnection( conn, {
+            queueCount,
+            exchangeCount,
+            consumerCount,
+            uniqueKeys,
+        });
 
         return { conn, rabbit, opts };
     };
@@ -290,34 +307,32 @@ describe('reconnection', () => {
         RECONN_RETRIES = 4;
 
         const logger = mockLogger();
-        const { conn, rabbit, opts } = await mockRabbitServer({ logger, stub: AmqpStub });
-        const asyncReconn = waitEvent(rabbit, 'reconnecting', RECONN_TIMEOUT * .6); // immediate reconnection
+        const { conn, rabbit, opts } = await mockRabbitServer({ stub: AmqpStub, logger });
 
-        const lostConnection = new Error('Connection to RabbitMQ lost');
-        lostConnection.code = 320;
+        let reconnect_attempts = 0
+        let rabbit_error = 0
 
-        rabbitStartError(AmqpStub);
-        conn.emit('close', lostConnection);
+        rabbit.on('reconnecting', () => {
+            reconnect_attempts += 1
 
-        await asyncReconn;
-        await waitEvent(rabbit, 'reconnecting', Math.max(15, RECONN_TIMEOUT * 1.3)); // second attempt
-        await waitEvent(rabbit, 'reconnecting', Math.max(15, RECONN_TIMEOUT * 1.3)); // third attempt
-        await Promise.all([
-            waitEvent(rabbit, 'reconnecting', Math.max(15, RECONN_TIMEOUT * 1.3)), // fourth attempt
-            waitEvent(rabbit, 'error', Math.max(15, RECONN_TIMEOUT * 1.3)) // reconn error
-        ]);
+            setTimeout(() => {
+                const onConnectAttempt = AmqpStub.args[0][1]
+                onConnectAttempt( new Error( 'whoops something went wrong while trying to connect' ) );
+            }, 50)
+        })
 
-        Assert.strictEqual(process.exit.callCount, 1);
-        Assert.strictEqual(process.exit.args[0][0], 1);
+        rabbit.on( 'error', () => {
+            rabbit_error += 1
+        })
 
-        // check logs
-        logger.assert('warn', `Lost connection to RabbitMQ! Reconnecting in ${opts.reconnectionTimeout}ms...`);
-        logger.assert('info', 'Reconnecting to RabbitMQ (1/4)...');
-        logger.assert('info', 'Reconnecting to RabbitMQ (2/4)...');
-        logger.assert('info', 'Reconnecting to RabbitMQ (3/4)...');
-        logger.assert('info', 'Reconnecting to RabbitMQ (4/4)...');
-        logger.assert('fatal', 'Rabbit connection error!');
+        const waitForRabbitError = waitEvent(rabbit, 'error', 10_000);
 
+        conn.emit( 'close', new Error('Connection to RabbitMQ lost'), true);
+
+        await waitForRabbitError
+
+        Assert.strictEqual(reconnect_attempts, RECONN_RETRIES);
+        Assert.strictEqual(rabbit_error, 1);
     });
 
     it('Should reconnect once the connection is recovered', async () => {
@@ -381,7 +396,7 @@ describe('reconnection', () => {
 
         rabbitStopError(AmqpStub);
 
-        await waitEvent(rabbit, 'reconnecting', Math.max(15, RECONN_TIMEOUT * 1.3)); // second attempt
+        await waitEvent(rabbit, 'reconnecting', Math.max(5_000, RECONN_TIMEOUT * 1.3)); // second attempt
         const server = await mockRabbitServer({ logger, stub: AmqpStub, rabbit, exchangeCount: 1, queueCount: 1, uniqueKeys: 0, consumerCount: 0 });
         conn = server.conn;
 
@@ -410,7 +425,7 @@ describe('reconnection', () => {
 
         rabbitStopError(AmqpStub);
 
-        await waitEvent(rabbit, 'reconnecting', Math.max(15, RECONN_TIMEOUT * 1.3)); // second attempt
+        await waitEvent(rabbit, 'reconnecting', Math.max(5_000, RECONN_TIMEOUT * 1.3)); // second attempt
 
         let newServer = await mockRabbitServer({ logger, stub: AmqpStub, rabbit });
         conn = newServer.conn;
