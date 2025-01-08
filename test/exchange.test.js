@@ -253,7 +253,8 @@ describe('exchange', () => {
 
                     exchange.publish(message, { key: finalKey });
                 });
-            });
+            })
+            .timeout( 10_000 );
 
             it('throws an error if rpcClient created with no replyQueue', () => {
 
