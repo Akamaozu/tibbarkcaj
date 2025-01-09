@@ -348,11 +348,11 @@ describe('reconnection', () => {
         conn.emit('close', lostConnection);
 
         await asyncReconn;
-        await waitEvent(rabbit, 'reconnecting', Math.max(15, RECONN_TIMEOUT * 1.3)); // second attempt
+        await waitEvent(rabbit, 'reconnecting', Math.max(5_000, RECONN_TIMEOUT * 1.3)); // second attempt
 
         rabbitStopError(AmqpStub);
 
-        await waitEvent(rabbit, 'reconnecting', Math.max(15, RECONN_TIMEOUT * 1.3)); // third attempt
+        await waitEvent(rabbit, 'reconnecting', Math.max(5_000, RECONN_TIMEOUT * 1.3)); // third attempt
 
         await mockRabbitServer({ logger, stub: AmqpStub, rabbit });
 
