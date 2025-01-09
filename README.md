@@ -1,5 +1,7 @@
 # Jackrabbit
 
+[![Coverage Status](https://coveralls.io/repos/github/Akamaozu/tibbarkcaj/badge.svg?branch=master)](https://coveralls.io/github/Akamaozu/tibbarkcaj?branch=master)
+
 This is a fork of [pagerinc/jackrabbit], which is a fork of [hunterloftis/jackrabbit].
 
 Jackrabbit is a very opinionated abstraction built on top of `amqplib` focused
