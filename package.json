@@ -57,10 +57,6 @@
     "semantic-release": "21.x",
     "sinon": "15.x"
   },
-  "mocha": {
-    "bail": true,
-    "recursive": true
-  },
   "scripts": {
     "test": "mocha",
     "test:coverage": "nyc mocha",
