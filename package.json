@@ -47,11 +47,13 @@
   "devDependencies": {
     "@pager/semantic-release-config": "2.x",
     "chai": "4.x",
+    "coveralls": "^3.1.1",
     "dotenv": "16.3.1",
     "eslint": "7.x",
     "eslint-config-hapi": "12.x",
     "eslint-plugin-hapi": "4.x",
     "mocha": "10.x",
+    "nyc": "^17.1.0",
     "semantic-release": "21.x",
     "sinon": "15.x"
   },
@@ -61,6 +63,8 @@
   },
   "scripts": {
     "test": "mocha",
+    "test:coverage": "nyc mocha",
+    "test:coverage:report": "node ./test/scripts/run-tests-and-report-coverage",
     "lint": "eslint lib/** test/**"
   },
   "release": {
