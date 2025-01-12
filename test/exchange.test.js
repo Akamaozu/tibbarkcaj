@@ -89,6 +89,79 @@ describe('exchange', () => {
                 .connect(connection)
                 .once('connected', done);
         });
+
+        const typeof_examples_map = {
+            string: {
+                typeof: 'string',
+                example: 'hello world',
+            },
+            number: {
+                typeof: 'number',
+                example: 100_000,
+            },
+            boolean: {
+                typeof: 'boolean',
+                example: true,
+            },
+            bigint: {
+                typeof: 'bigint',
+                example: 1n,
+            },
+            symbol: {
+                typeof: 'symbol',
+                example: Symbol(),
+            },
+            null: {
+                typeof: 'null',
+                example: null,
+            },
+            undefined: {
+                typeof: 'undefined',
+                example: undefined,
+            },
+            object: {
+                typeof: 'object',
+                example: { id: 'hello world' },
+            },
+            function: {
+                typeof: 'function',
+                example: () => 'hello world',
+            },
+        }
+
+        const valid_typeof_exchange_names = [ 'string' ]
+
+        const typeof_example_keys = Object.keys( typeof_examples_map )
+
+        const truthy_typeof_example_keys = typeof_example_keys.filter( key => {
+            return (typeof_examples_map[ key ].example && 'truthy') === 'truthy'
+        })
+
+        truthy_typeof_example_keys.forEach( typeof_key => {
+
+            if ( valid_typeof_exchange_names.indexOf( typeof_key ) === -1 ) {
+                it(`closes exchange if typeof exchange name is "${ typeof_key }"`, (done) => {
+
+                    Exchange(typeof_examples_map[ typeof_key ].example, 'direct')
+                        .connect(connection)
+                        .once('close', (error) => {
+                            Assert( error instanceof TypeError, 'expected type error on Exchange close' )
+                            done()
+                        });
+                });
+            }
+
+            else {
+                it(`emits a "ready" event if typeof exchange name is "${ typeof_key }"`, (done) => {
+
+                    Exchange(typeof_examples_map[ typeof_key ].example, 'direct')
+                        .connect(connection)
+                        .once('ready', () => {
+                            done()
+                        });
+                });
+            }
+        });
     });
 
     describe('#getWritableStream', () => {
