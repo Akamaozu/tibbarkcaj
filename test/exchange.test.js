@@ -140,7 +140,7 @@ describe('exchange', () => {
         truthy_typeof_example_keys.forEach( typeof_key => {
 
             if ( valid_typeof_exchange_names.indexOf( typeof_key ) === -1 ) {
-                it(`closes exchange if typeof exchange name is "${ typeof_key }"`, (done) => {
+                it(`closes exchange with TypeError if typeof exchange name is "${ typeof_key }"`, (done) => {
 
                     Exchange(typeof_examples_map[ typeof_key ].example, 'direct')
                         .connect(connection)
