@@ -54,11 +54,28 @@ describe('exchange', () => {
                 });
             });
 
+            describe('and a headers type', () => {
+
+                const e = Exchange(undefined, 'headers');
+                it('receives the default name amq.headers', () => {
+
+                    Assert.equal(e.name, 'amq.headers');
+                });
+            });
+
             describe('and no type', () => {
 
                 it('throws an error', () => {
 
                     Assert.throws(Exchange.bind(this, undefined, undefined), 'missing exchange type');
+                });
+            });
+
+            describe('and non-default (custom) type', () => {
+
+                it('throws an error', () => {
+
+                    Assert.throws(Exchange.bind(this, undefined, 'random'), 'missing exchange name');
                 });
             });
         });
