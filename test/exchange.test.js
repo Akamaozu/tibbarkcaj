@@ -90,7 +90,7 @@ describe('exchange', () => {
                 .once('connected', done);
         });
 
-        const typeof_examples_map = {
+        const typeofExamplesMap = {
             string: {
                 typeof: 'string',
                 example: 'hello world',
@@ -129,35 +129,40 @@ describe('exchange', () => {
             },
         }
 
-        const valid_typeof_exchange_names = [ 'string' ]
+        const validTypeofExchangeNames = [ 'string' ]
 
-        const typeof_example_keys = Object.keys( typeof_examples_map )
+        const typeofExampleKeys = Object.keys( typeofExamplesMap )
 
-        const truthy_typeof_example_keys = typeof_example_keys.filter( key => {
-            return (typeof_examples_map[ key ].example && 'truthy') === 'truthy'
+        const truthyTypeofExampleKeys = typeofExampleKeys.filter( key => {
+            return (typeofExamplesMap[ key ].example && 'truthy') === 'truthy'
         })
 
-        truthy_typeof_example_keys.forEach( typeof_key => {
-
-            if ( valid_typeof_exchange_names.indexOf( typeof_key ) === -1 ) {
-                it(`closes exchange with TypeError if typeof exchange name is "${ typeof_key }"`, (done) => {
-
-                    Exchange(typeof_examples_map[ typeof_key ].example, 'direct')
+        truthyTypeofExampleKeys.forEach( typeofKey => {
+            if (validTypeofExchangeNames.indexOf( typeofKey ) === -1) {
+                it(`closes exchange with TypeError if typeof exchange name is "${ typeofKey }"`, (done) => {
+                    Exchange(typeofExamplesMap[ typeofKey ].example, 'direct')
                         .connect(connection)
                         .once('close', (error) => {
-                            Assert( error instanceof TypeError, 'expected type error on Exchange close' )
-                            done()
+                            Assert(error instanceof TypeError, 'expected type error on Exchange close');
+                            done();
                         });
                 });
             }
 
             else {
-                it(`emits a "ready" event if typeof exchange name is "${ typeof_key }"`, (done) => {
-
-                    Exchange(typeof_examples_map[ typeof_key ].example, 'direct')
+                it(`emits a "ready" event if typeof exchange name is "${ typeofKey }"`, (done) => {
+                    const exchangeName = typeofExamplesMap[ typeofKey ].example
+                    const exchange = Exchange(exchangeName, 'direct')
                         .connect(connection)
                         .once('ready', () => {
-                            done()
+                            const { channel } = exchange.getInternals()
+                            channel.deleteExchange(exchangeName, {}, (error) => {
+                                if (error) {
+                                    console.log(`WARN: failed to delete exchange "${ exchangeName }" -- ${ error.stack ?? error.message ?? 'unspecified error' }`);
+                                }
+
+                                done();
+                            });
                         });
                 });
             }
