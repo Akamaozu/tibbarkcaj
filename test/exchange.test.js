@@ -54,11 +54,28 @@ describe('exchange', () => {
                 });
             });
 
+            describe('and a headers type', () => {
+
+                const e = Exchange(undefined, 'headers');
+                it('receives the default name amq.headers', () => {
+
+                    Assert.equal(e.name, 'amq.headers');
+                });
+            });
+
             describe('and no type', () => {
 
                 it('throws an error', () => {
 
                     Assert.throws(Exchange.bind(this, undefined, undefined), 'missing exchange type');
+                });
+            });
+
+            describe('and non-default (custom) type', () => {
+
+                it('throws an error', () => {
+
+                    Assert.throws(Exchange.bind(this, undefined, 'random'), 'missing exchange name');
                 });
             });
         });
@@ -88,6 +105,84 @@ describe('exchange', () => {
             Exchange('', 'direct')
                 .connect(connection)
                 .once('connected', done);
+        });
+
+        const typeofExamplesMap = {
+            string: {
+                typeof: 'string',
+                example: 'hello world',
+            },
+            number: {
+                typeof: 'number',
+                example: 100_000,
+            },
+            boolean: {
+                typeof: 'boolean',
+                example: true,
+            },
+            bigint: {
+                typeof: 'bigint',
+                example: 1n,
+            },
+            symbol: {
+                typeof: 'symbol',
+                example: Symbol(),
+            },
+            null: {
+                typeof: 'null',
+                example: null,
+            },
+            undefined: {
+                typeof: 'undefined',
+                example: undefined,
+            },
+            object: {
+                typeof: 'object',
+                example: { id: 'hello world' },
+            },
+            function: {
+                typeof: 'function',
+                example: () => 'hello world',
+            },
+        }
+
+        const validTypeofExchangeNames = [ 'string' ]
+
+        const typeofExampleKeys = Object.keys( typeofExamplesMap )
+
+        const truthyTypeofExampleKeys = typeofExampleKeys.filter( key => {
+            return (typeofExamplesMap[ key ].example && 'truthy') === 'truthy'
+        })
+
+        truthyTypeofExampleKeys.forEach( typeofKey => {
+            if (validTypeofExchangeNames.indexOf( typeofKey ) === -1) {
+                it(`closes exchange with TypeError if typeof exchange name is "${ typeofKey }"`, (done) => {
+                    Exchange(typeofExamplesMap[ typeofKey ].example, 'direct')
+                        .connect(connection)
+                        .once('close', (error) => {
+                            Assert(error instanceof TypeError, 'expected type error on Exchange close');
+                            done();
+                        });
+                });
+            }
+
+            else {
+                it(`emits a "ready" event if typeof exchange name is "${ typeofKey }"`, (done) => {
+                    const exchangeName = typeofExamplesMap[ typeofKey ].example
+                    const exchange = Exchange(exchangeName, 'direct')
+                        .connect(connection)
+                        .once('ready', () => {
+                            const { channel } = exchange.getInternals()
+                            channel.deleteExchange(exchangeName, {}, (error) => {
+                                if (error) {
+                                    console.log(`WARN: failed to delete exchange "${ exchangeName }" -- ${ error.stack ?? error.message ?? 'unspecified error' }`);
+                                }
+
+                                done();
+                            });
+                        });
+                });
+            }
         });
     });
 
