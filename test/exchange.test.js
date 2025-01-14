@@ -307,7 +307,8 @@ describe('exchange', () => {
 
                     const channelWithReply = connection.connection.channels.filter((channel) => channel.channel.reply);
                     Assert.lengthOf(channelWithReply, 0);
-                    done();
+
+                    deleteExchange(exchange, () => done());
                 });
             });
 
@@ -321,7 +322,8 @@ describe('exchange', () => {
                     const channelWithReply = connection.connection.channels.filter((channel) => channel.channel.reply);
                     Assert.lengthOf(channelWithReply, 1);
                     Assert.exists(channelWithReply[0].channel.reply);
-                    done();
+
+                    deleteExchange(exchange, () => done());
                 });
             });
 
@@ -341,7 +343,10 @@ describe('exchange', () => {
                     Assert.equal(message, data);
                     Assert.equal(msg.fields.routingKey, finalKey);
                     ack();
-                    queue.cancel(done);
+
+                    queue.cancel(() => {
+                        deleteExchange(exchange, () => done());
+                    });
                 });
 
                 queue.once('bound', () => {
@@ -369,3 +374,14 @@ describe('exchange', () => {
         });
     });
 });
+
+function deleteExchange(exchange, callback) {
+    const { channel } = exchange.getInternals()
+    channel.deleteExchange(exchange.name, {}, (error) => {
+        if (error) {
+            console.log(`WARN: failed to delete exchange "${ exchange.name }" -- ${ error.stack ?? error.message ?? 'unspecified error' }`);
+        }
+
+        callback(error, !error);
+    });
+}
