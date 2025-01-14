@@ -1,11 +1,16 @@
-const dotenv = require('dotenv')
-const path = require('node:path')
-const child_process = require('node:child_process')
+'use strict';
 
-dotenv.config({ path: path.join( __dirname, '../../.env' ) })
+const Dotenv = require('dotenv');
+const Path = require('node:path');
+const ChildProcess = require('node:child_process');
 
-child_process.exec( 'npm run test:coverage && nyc report --reporter=text-lcov | coveralls', ( error, stdout, stderr ) => {
-  console.log( stdout )
+Dotenv.config({ path: Path.join( __dirname, '../../.env' ) });
 
-  if (error) console.log( stderr )
-})
+ChildProcess.exec( 'npm run test:coverage && nyc report --reporter=text-lcov | coveralls', ( error, stdout, stderr ) => {
+
+    console.log( stdout );
+
+    if (error) {
+        console.log( stderr );
+    }
+});
